@@ -27,6 +27,7 @@
     --ui:'Rajdhani',sans-serif;
     --mono:'JetBrains Mono',monospace;
     --cols:8;
+    --brand-logo-width:30%; /*Logo Banner Size Aisin Studio */
   }
 
   *{box-sizing:border-box}
@@ -49,10 +50,9 @@
     padding:26px 0 70px;
   }
 
-  .brand{display:flex;justify-content:center;align-items:baseline;gap:10px;margin-bottom:24px}
-  .brand .mark{font-family:var(--display);font-size:26px;letter-spacing:.07em;text-transform:uppercase}
-  .brand .mark em{font-style:normal;color:var(--red2)}
-  .brand .tag{font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--muted);text-transform:uppercase}
+  .brand{display:flex;justify-content:center;align-items:center;margin-bottom:24px}
+  .brand-logo{display:flex;justify-content:center;align-items:center;width:100%}
+  .brand-logo img{display:block;width:var(--brand-logo-width);max-width:760px;height:auto;object-fit:contain;filter:drop-shadow(0 0 18px rgba(255,41,61,.18))}
 
   .scanner{
     max-width:860px;
@@ -69,10 +69,11 @@
   .scan-inner{display:flex;align-items:center;gap:14px;padding:15px 18px}
   .scan-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--red2);text-transform:uppercase;white-space:nowrap}
   .scan-row{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-  .scan-row input{width:100%;background:transparent;border:0;outline:0;color:var(--text);font-family:var(--mono);font-size:13px}
+  .scan-row input{width:100%;background:transparent;border:0;outline:0;color:var(--text);font-family:var(--mono);font-size:13px;caret-color:var(--red2)}
+  .scan-row input:focus{outline:none}
   .scan-row input::placeholder{color:#52525a}
-  .caret{width:7px;height:15px;background:var(--red2);animation:blink 1s step-end infinite}
-  @keyframes blink{50%{opacity:0}}
+  .scan-row input::selection{background:rgba(255,41,61,.25)}
+  .caret{display:none}
 
   .tags{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:18px 0 16px}
   .chip{
@@ -242,8 +243,9 @@ if(!AISIN_LOCAL){
 <body>
 <div class="wrap">
   <div class="brand">
-    <span class="mark">A<em>I</em>SIN</span>
-    <span class="tag">Studio Dossier</span><span class="version-tag">v24</span>
+    <div class="brand-logo">
+      <img src="images/banner_logo.png" alt="Aisin Studio banner logo" id="brandLogo" />
+    </div>
   </div>
 
   <div class="scanner">
