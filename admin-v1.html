@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Aisin Admin v1</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#09090b;--panel:#111116;--panel2:#17171d;--line:rgba(255,255,255,.08);--text:#f5f5f7;--muted:#9b9ba4;--red:#ff3045}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,sans-serif}
+body{min-height:100dvh}.wrap{width:min(980px,calc(100% - 28px));margin:auto;padding:24px 0 48px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.brand{font-size:28px;font-weight:850}.brand span{color:var(--red)}.version{font-size:12px;color:var(--muted);margin-left:6px}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:24px;padding:18px;margin-bottom:16px}.sub{color:var(--muted);line-height:1.45}.badge{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 11px;color:var(--muted);font-size:12px}
+.login-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px}input{width:100%;color:white;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;outline:none}button{border:0;border-radius:14px;padding:13px 16px;font-weight:750;cursor:pointer}.primary{color:white;background:linear-gradient(180deg,#ff4053,#e21f34)}.secondary{color:white;background:rgba(255,255,255,.08)}.danger{color:#ff9ba5;background:rgba(255,48,69,.1)}
+.drop{border:1.5px dashed rgba(255,255,255,.15);border-radius:22px;min-height:210px;display:grid;place-items:center;text-align:center;padding:28px;background:rgba(255,255,255,.02);cursor:pointer}.drop.drag{border-color:var(--red);background:rgba(255,48,69,.06)}.toolbar{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between}.status{font-size:12px;color:var(--muted)}.status.ok{color:#6ee7a0}.status.err{color:#ff8b98}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;margin-top:14px}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}.thumb{width:46px;height:62px;border-radius:8px;object-fit:cover;background:#1d1d22}.pill{display:inline-block;padding:6px 9px;border-radius:999px;font-size:11px;background:rgba(255,255,255,.06);color:var(--muted)}.pill.good{color:#74e7a1;background:rgba(34,197,94,.10)}.pill.bad{color:#ff98a4;background:rgba(255,48,69,.10)}.hidden{display:none!important}.progress{height:7px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:12px}.progress>div{height:100%;width:0;background:#fff}
+@media(max-width:760px){.login-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top"><div class="brand">Aisin<span>.</span><span class="version">Admin v1</span></div><div class="badge" id="dbBadge">Supabase: checking…</div></div>
+
+<section class="card">
+<h1>Bulk Card Uploader</h1>
+<p class="sub">Arrastra imágenes con nombres como <b>V1-001_Nami.jpg</b>. El panel detecta volumen, número y personaje.</p>
+</section>
+
+<section class="card" id="loginCard">
+<h2>Admin login</h2>
+<p class="sub">Usa un usuario creado en Supabase Auth.</p>
+<div class="login-grid">
+<input id="email" type="email" placeholder="Email de administrador">
+<input id="password" type="password" placeholder="Password">
+<button class="primary" onclick="login()">Sign in</button>
+</div>
+<div class="status" id="loginStatus" style="margin-top:10px">Not signed in</div>
+</section>
+
+<section class="card hidden" id="uploaderCard">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+<div><h2 style="margin-bottom:4px">Upload cards</h2><div class="status" id="sessionText"></div></div>
+<button class="secondary" onclick="logout()">Sign out</button>
+</div>
+
+<input id="fileInput" type="file" accept="image/*" multiple hidden>
+<div class="drop" id="dropZone" onclick="fileInput.click()">
+<div><strong>Drop images here</strong><br><small>o toca para seleccionar muchas imágenes</small><div class="sub" style="font-size:12px;margin-top:8px">Formato: V1-001_Nami.jpg</div></div>
+</div>
+
+<div class="toolbar">
+<div><button class="secondary" onclick="fileInput.click()">Add files</button> <button class="danger" onclick="clearQueue()">Clear</button> <span class="status" id="queueStatus">0 files</span></div>
+<button class="primary" id="uploadBtn" onclick="uploadAll()" disabled>Upload Cards</button>
+</div>
+
+<div class="progress hidden" id="progressWrap"><div id="progressBar"></div></div>
+<div class="status" id="uploadStatus" style="margin-top:9px"></div>
+
+<div class="table-wrap hidden" id="tableWrap">
+<table><thead><tr><th>Preview</th><th>Code</th><th>Character</th><th>Filename</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+</section>
+</div>
+
+<script>
+const SUPABASE_URL='https://sfwoguzaaubbefkylgrl.supabase.co';
+const SUPABASE_KEY='sb_publishable_uP72rwG4WNuC0aViiMyYzg_SU9QkVw6';
+const BUCKET='cards';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let queue=[];
+
+function escapeHtml(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;")}
+function parseFilename(file){
+  const base=file.name.replace(/\.[^.]+$/,'');
+  const m=base.match(/^V(\d+)-(\d{3})[_\-\s]+(.+)$/i);
+  if(!m)return{file,valid:false,error:'Invalid filename'};
+  const volume=Number(m[1]),cardNumber=Number(m[2]);
+  const character=m[3].replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim();
+  return{file,valid:true,volume,cardNumber,character,code:`V${volume}-${String(cardNumber).padStart(3,'0')}`,storageName:`V${volume}-${String(cardNumber).padStart(3,'0')}_${character.replace(/\s+/g,'-')}.${file.name.split('.').pop().toLowerCase()}`,status:'Ready'};
+}
+function addFiles(files){[...files].forEach(f=>queue.push(parseFilename(f)));renderQueue()}
+function clearQueue(){queue.forEach(q=>q.previewUrl&&URL.revokeObjectURL(q.previewUrl));queue=[];renderQueue()}
+function renderQueue(){
+ const body=document.getElementById('rows'),wrap=document.getElementById('tableWrap'),btn=document.getElementById('uploadBtn');
+ document.getElementById('queueStatus').textContent=`${queue.length} files`;
+ if(!queue.length){body.innerHTML='';wrap.classList.add('hidden');btn.disabled=true;return}
+ wrap.classList.remove('hidden');
+ body.innerHTML=queue.map(item=>{
+   if(!item.previewUrl)item.previewUrl=URL.createObjectURL(item.file);
+   const state=item.valid?`<span class="pill ${item.status==='Uploaded'?'good':''}">${item.status}</span>`:`<span class="pill bad">${item.error}</span>`;
+   return `<tr><td><img class="thumb" src="${item.previewUrl}"></td><td>${item.valid?item.code:'—'}</td><td>${item.valid?escapeHtml(item.character):'—'}</td><td>${escapeHtml(item.file.name)}</td><td>${state}</td></tr>`;
+ }).join('');
+ btn.disabled=!queue.some(x=>x.valid&&x.status!=='Uploaded');
+}
+async function login(){
+ const email=document.getElementById('email').value.trim(),password=document.getElementById('password').value,status=document.getElementById('loginStatus');
+ status.textContent='Signing in…';
+ const {data,error}=await db.auth.signInWithPassword({email,password});
+ if(error){status.textContent=error.message;status.className='status err';return}
+ showSession(data.session);
+}
+async function logout(){await db.auth.signOut();uploaderCard.classList.add('hidden');loginCard.classList.remove('hidden')}
+function showSession(session){if(!session)return;loginCard.classList.add('hidden');uploaderCard.classList.remove('hidden');sessionText.textContent=`Signed in: ${session.user.email}`}
+async function uploadAll(){
+ const items=queue.filter(x=>x.valid&&x.status!=='Uploaded'); if(!items.length)return;
+ uploadBtn.disabled=true;progressWrap.classList.remove('hidden');let done=0,failed=0;
+ for(const item of items){
+   item.status='Uploading';renderQueue();
+   try{
+     const {error:se}=await db.storage.from(BUCKET).upload(item.storageName,item.file,{upsert:true,contentType:item.file.type||undefined}); if(se)throw se;
+     const {error:re}=await db.from('cards').upsert({character_name:item.character,volume:item.volume,card_number:item.cardNumber,image_file:item.storageName},{onConflict:'volume,card_number'}); if(re)throw re;
+     item.status='Uploaded';done++;
+   }catch(err){item.valid=false;item.error=err.message||String(err);failed++}
+   const complete=done+failed;progressBar.style.width=`${Math.round(complete/items.length*100)}%`;uploadStatus.textContent=`Uploaded ${done}/${items.length}${failed?` · ${failed} failed`:''}`;renderQueue();
+ }
+ uploadBtn.disabled=false;
+ uploadStatus.className=failed?'status err':'status ok';
+}
+async function checkConnection(){const {error}=await db.from('cards').select('id').limit(1);dbBadge.textContent=error?'Supabase: error':'Supabase: connected';dbBadge.style.color=error?'#ff8b98':'#76e7a1'}
+fileInput.addEventListener('change',e=>{addFiles(e.target.files);e.target.value=''});
+['dragenter','dragover'].forEach(evt=>dropZone.addEventListener(evt,e=>{e.preventDefault();dropZone.classList.add('drag')}));
+['dragleave','drop'].forEach(evt=>dropZone.addEventListener(evt,e=>{e.preventDefault();dropZone.classList.remove('drag')}));
+dropZone.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+db.auth.onAuthStateChange((event,session)=>{if(session)showSession(session)});
+(async()=>{checkConnection();const {data}=await db.auth.getSession();if(data.session)showSession(data.session)})();
+</script>
+</body>
+</html>
